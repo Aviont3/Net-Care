@@ -46,12 +46,8 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-east-1"
     
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = [
-        "http://localhost:5173",  # Vite dev server
-        "http://localhost:3000",  # Alternative
-        "http://localhost:8000",  # Backend
-    ]
-    
+    BACKEND_CORS_ORIGINS: str | List[str] = "http://localhost:5173,http://localhost:3000,http://localhost:8000"
+
     # Daycare-specific settings
     DAYCARE_NAME: str = "Netta's Bounce Around Daycare LLC"
     DAYCARE_ADDRESS: str = "Chicago, IL"
@@ -63,23 +59,34 @@ class Settings(BaseSettings):
     CURRENT_ENROLLMENT: int = 15
     AGE_RANGE_MIN: str = "6 weeks"
     AGE_RANGE_MAX: str = "12 years"
-    
+
     # Compliance
     LATE_PICKUP_GRACE_MINUTES: int = 15  # Grace period before late fee
     LATE_PICKUP_FEE_PER_MINUTE: float = 1.00  # $1 per minute after grace
     VACCINE_GRACE_PERIOD_DAYS: int = 30  # New enrollment grace period
     DCFS_LICENSE_NUMBER: str = ""
-    
+
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = 10
-    ALLOWED_FILE_EXTENSIONS: List[str] = [".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"]
-    
+    ALLOWED_FILE_EXTENSIONS: str | List[str] = ".pdf,.jpg,.jpeg,.png,.doc,.docx"
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: str | List[str]) -> List[str]:
-        if isinstance(v, str):
+        if isinstance(v, str) and v:
             return [i.strip() for i in v.split(",")]
-        return v
+        elif isinstance(v, list):
+            return v
+        return []
+
+    @field_validator("ALLOWED_FILE_EXTENSIONS", mode="before")
+    @classmethod
+    def assemble_file_extensions(cls, v: str | List[str]) -> List[str]:
+        if isinstance(v, str) and v:
+            return [i.strip() for i in v.split(",")]
+        elif isinstance(v, list):
+            return v
+        return []
     
     class Config:
         env_file = ".env"

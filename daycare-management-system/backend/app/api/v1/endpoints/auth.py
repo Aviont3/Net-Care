@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, Token, UserCreate, UserResponse
-from app.core.security import verify_password, get_password_hash, create_access_token
+from app.core.security import verify_password, get_password_hash, create_access_token, get_current_user
 from app.core.config import settings
 
 router = APIRouter()
@@ -65,7 +65,6 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         password_hash=get_password_hash(user_data.password),
         first_name=user_data.first_name,
         last_name=user_data.last_name,
-        phone=user_data.phone,
         role=user_data.role
     )
     

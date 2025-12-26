@@ -5,10 +5,21 @@ from datetime import datetime, timedelta
 from typing import Optional
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
 from app.core.config import settings
 
 # Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Explicitly set bcrypt rounds to avoid version detection issues
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12
+)
+
+# OAuth2 scheme for token authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -48,10 +59,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 def decode_access_token(token: str) -> Optional[dict]:
     """
     Decode and verify a JWT token.
-    
+
     Args:
         token: JWT token string
-    
+
     Returns:
         Decoded token payload or None if invalid
     """
@@ -60,3 +71,54 @@ def decode_access_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(lambda: None)
+):
+    """
+    Get the current authenticated user from the JWT token.
+
+    Args:
+        token: JWT token from Authorization header
+        db: Database session
+
+    Returns:
+        User object
+
+    Raises:
+        HTTPException: If token is invalid or user not found
+    """
+    from app.database import get_db
+    from app.models.user import User
+
+    # Get db session if not provided by dependency
+    if db is None:
+        db = next(get_db())
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    payload = decode_access_token(token)
+    if payload is None:
+        raise credentials_exception
+
+    email: str = payload.get("sub")
+    if email is None:
+        raise credentials_exception
+
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise credentials_exception
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive"
+        )
+
+    return user

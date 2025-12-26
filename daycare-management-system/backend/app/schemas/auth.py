@@ -1,6 +1,7 @@
 # Authentication Schemas (Request/Response)
 # ============================================
 
+from typing import Optional
 from pydantic import BaseModel, EmailStr
 
 
@@ -27,7 +28,6 @@ class UserCreate(BaseModel):
     password: str
     first_name: str
     last_name: str
-    phone: Optional[str] = None
     role: str = "staff"
 
 
@@ -38,8 +38,7 @@ class UserResponse(BaseModel):
     first_name: str
     last_name: str
     role: str
-    phone: Optional[str]
     is_active: bool
-    
+
     class Config:
         from_attributes = True
