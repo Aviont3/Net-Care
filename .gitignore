@@ -1,0 +1,27 @@
+# Windows reserved names
+nul
+NUL
+
+# Environment files with secrets
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Postgres password file
+%APPDATA%postgresqlpgpass.conf

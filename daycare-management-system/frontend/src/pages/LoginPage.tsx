@@ -61,9 +61,21 @@ export const LoginPage: React.FC = () => {
       navigate(from, { replace: true });
     } catch (error: any) {
       console.error('Login error:', error);
-      setApiError(
-        error.response?.data?.detail || 'Login failed. Please check your credentials and try again.'
-      );
+
+      // Handle error message properly (could be string or array of validation errors)
+      let errorMessage = 'Login failed. Please check your credentials and try again.';
+
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else if (Array.isArray(detail)) {
+          // Validation errors from FastAPI
+          errorMessage = detail.map((err: any) => err.msg).join(', ');
+        }
+      }
+
+      setApiError(errorMessage);
     } finally {
       setLoading(false);
     }

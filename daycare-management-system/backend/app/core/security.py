@@ -1,5 +1,6 @@
 # Security Utilities (Password Hashing, JWT Tokens)
 # ============================================
+# Fixed dependency injection for get_current_user
 
 from datetime import datetime, timedelta
 from typing import Optional
@@ -9,6 +10,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.core.config import settings
+from app.database import get_db
 
 # Password hashing context
 # Explicitly set bcrypt rounds to avoid version detection issues
@@ -75,7 +77,7 @@ def decode_access_token(token: str) -> Optional[dict]:
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(lambda: None)
+    db: Session = Depends(get_db)
 ):
     """
     Get the current authenticated user from the JWT token.
@@ -90,12 +92,11 @@ async def get_current_user(
     Raises:
         HTTPException: If token is invalid or user not found
     """
-    from app.database import get_db
     from app.models.user import User
 
-    # Get db session if not provided by dependency
-    if db is None:
-        db = next(get_db())
+    print(f"DEBUG: get_current_user called")
+    print(f"DEBUG: token: {token[:30] if token else 'None'}...")
+    print(f"DEBUG: db session: {db}")
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -104,21 +105,29 @@ async def get_current_user(
     )
 
     payload = decode_access_token(token)
+    print(f"DEBUG: decoded payload: {payload}")
     if payload is None:
+        print("DEBUG: payload is None, raising 401")
         raise credentials_exception
 
     email: str = payload.get("sub")
+    print(f"DEBUG: email from token: {email}")
     if email is None:
+        print("DEBUG: email is None, raising 401")
         raise credentials_exception
 
     user = db.query(User).filter(User.email == email).first()
+    print(f"DEBUG: user query result: {user}")
     if user is None:
+        print("DEBUG: user not found in database, raising 401")
         raise credentials_exception
 
     if not user.is_active:
+        print("DEBUG: user is not active, raising 403")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive"
         )
 
+    print(f"DEBUG: returning user: {user.email}")
     return user

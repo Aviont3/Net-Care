@@ -16,8 +16,15 @@ const api: AxiosInstance = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
+    console.log('DEBUG: Request interceptor');
+    console.log('DEBUG: Token from localStorage:', token ? token.substring(0, 30) + '...' : 'NO TOKEN');
+    console.log('DEBUG: Request URL:', config.url);
+    console.log('DEBUG: Base URL:', config.baseURL);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('DEBUG: Authorization header set');
+    } else {
+      console.log('DEBUG: NO TOKEN - Authorization header NOT set');
     }
     return config;
   },

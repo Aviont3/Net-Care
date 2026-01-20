@@ -56,6 +56,9 @@ async def get_children(
     Get paginated list of children.
     Supports search and filtering.
     """
+    print("DEBUG: get_children endpoint called!")
+    print(f"DEBUG: current_user in endpoint: {current_user.email if current_user else 'None'}")
+
     query = db.query(Child)
 
     # Apply filters
