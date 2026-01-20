@@ -2,7 +2,7 @@
 # ============================================
 
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 
 
 class Token(BaseModel):
@@ -33,12 +33,11 @@ class UserCreate(BaseModel):
 
 class UserResponse(BaseModel):
     """User response schema"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     email: str
     first_name: str
     last_name: str
     role: str
     is_active: bool
-
-    class Config:
-        from_attributes = True
