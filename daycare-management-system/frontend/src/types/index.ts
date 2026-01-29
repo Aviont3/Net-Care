@@ -45,12 +45,16 @@ export interface Child {
   first_name: string;
   last_name: string;
   date_of_birth: string;
-  gender: string;
-  enrollment_date: string;
-  is_active: boolean;
+  gender?: string;
   allergies?: string;
-  medical_notes?: string;
+  dietary_restrictions?: string;
+  medical_conditions?: string;
   special_needs?: string;
+  photo_url?: string;
+  enrollment_date: string;
+  withdrawal_date?: string;
+  is_active: boolean;
+  created_by?: string;
   created_at: string;
   updated_at: string;
 }
@@ -59,11 +63,89 @@ export interface ChildCreate {
   first_name: string;
   last_name: string;
   date_of_birth: string;
-  gender: string;
-  enrollment_date: string;
+  gender?: string;
   allergies?: string;
-  medical_notes?: string;
+  dietary_restrictions?: string;
+  medical_conditions?: string;
   special_needs?: string;
+  photo_url?: string;
+  enrollment_date: string;
+  withdrawal_date?: string;
+  is_active?: boolean;
+}
+
+export interface ChildUpdate {
+  first_name?: string;
+  last_name?: string;
+  date_of_birth?: string;
+  gender?: string;
+  allergies?: string;
+  dietary_restrictions?: string;
+  medical_conditions?: string;
+  special_needs?: string;
+  photo_url?: string;
+  enrollment_date?: string;
+  withdrawal_date?: string;
+  is_active?: boolean;
+}
+
+export interface ChildListResponse {
+  children: Child[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+// Emergency Contact Types
+export interface EmergencyContact {
+  id: string;
+  child_id: string;
+  name: string;
+  relationship_type: string;
+  phone_primary: string;
+  phone_secondary?: string;
+  priority_order: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmergencyContactCreate {
+  child_id: string;
+  name: string;
+  relationship_type: string;
+  phone_primary: string;
+  phone_secondary?: string;
+  priority_order: number;
+  notes?: string;
+}
+
+// Authorized Pickup Types
+export interface AuthorizedPickup {
+  id: string;
+  child_id: string;
+  name: string;
+  relationship_type: string;
+  phone: string;
+  photo_url?: string;
+  identification_notes?: string;
+  requires_password: boolean;
+  password_hint?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthorizedPickupCreate {
+  child_id: string;
+  name: string;
+  relationship_type: string;
+  phone: string;
+  photo_url?: string;
+  identification_notes?: string;
+  requires_password?: boolean;
+  password_hint?: string;
+  is_active?: boolean;
 }
 
 // Parent Types
