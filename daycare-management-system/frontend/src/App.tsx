@@ -6,6 +6,8 @@ import { AdminDashboard } from '@/pages/AdminDashboard';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 import { CheckInKiosk } from '@/pages/CheckInKiosk';
 import { ChildrenPage } from '@/pages/ChildrenPage';
+import { AttendanceCalendar } from '@/pages/AttendanceCalendar';
+import { ParentsPage } from '@/pages/ParentsPage';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 function App() {
@@ -31,7 +33,7 @@ function App() {
           <Route
             path="/children"
             element={
-              <ProtectedRoute requiredRole="staff">
+              <ProtectedRoute>
                 <ChildrenPage />
               </ProtectedRoute>
             }
@@ -40,12 +42,8 @@ function App() {
           <Route
             path="/attendance"
             element={
-              <ProtectedRoute requiredRole="staff">
-                <PlaceholderPage
-                  title="Attendance Tracking"
-                  description="Record check-ins, check-outs, and monitor daily attendance."
-                  icon={<svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>}
-                />
+              <ProtectedRoute>
+                <AttendanceCalendar />
               </ProtectedRoute>
             }
           />
@@ -53,7 +51,7 @@ function App() {
           <Route
             path="/activities"
             element={
-              <ProtectedRoute requiredRole="staff">
+              <ProtectedRoute>
                 <PlaceholderPage
                   title="Daily Activities"
                   description="Log and track daily activities, meals, naps, and more."
@@ -66,12 +64,8 @@ function App() {
           <Route
             path="/parents"
             element={
-              <ProtectedRoute requiredRole="staff">
-                <PlaceholderPage
-                  title="Parent Management"
-                  description="Manage parent and guardian information and contacts."
-                  icon={<svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
-                />
+              <ProtectedRoute>
+                <ParentsPage />
               </ProtectedRoute>
             }
           />
@@ -79,7 +73,7 @@ function App() {
           <Route
             path="/medications"
             element={
-              <ProtectedRoute requiredRole="staff">
+              <ProtectedRoute>
                 <PlaceholderPage
                   title="Medication Management"
                   description="Track medication authorizations and administration logs."
@@ -92,7 +86,7 @@ function App() {
           <Route
             path="/incidents"
             element={
-              <ProtectedRoute requiredRole="staff">
+              <ProtectedRoute>
                 <PlaceholderPage
                   title="Incident Reports"
                   description="Document and manage incident reports and notifications."
@@ -118,7 +112,7 @@ function App() {
           <Route
             path="/reports"
             element={
-              <ProtectedRoute requiredRole="staff">
+              <ProtectedRoute>
                 <PlaceholderPage
                   title="Reports & Analytics"
                   description="Generate and view attendance, activity, and financial reports."

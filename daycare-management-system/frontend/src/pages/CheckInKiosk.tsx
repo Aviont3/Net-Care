@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { childrenService } from '@/services/childrenService';
+import { attendanceService } from '@/services/attendanceService';
 
 interface Child {
   id: string;
@@ -7,25 +9,58 @@ interface Child {
   last_name: string;
   photo_url?: string;
   is_checked_in: boolean;
+  attendance_id?: string; // Store attendance ID for check-out
 }
 
 export const CheckInKiosk: React.FC = () => {
   const navigate = useNavigate();
-  const [children, setChildren] = useState<Child[]>([
-    // Mock data - replace with API call
-    { id: '1', first_name: 'Emma', last_name: 'Johnson', is_checked_in: false },
-    { id: '2', first_name: 'Liam', last_name: 'Smith', is_checked_in: true },
-    { id: '3', first_name: 'Olivia', last_name: 'Williams', is_checked_in: false },
-    { id: '4', first_name: 'Noah', last_name: 'Brown', is_checked_in: false },
-    { id: '5', first_name: 'Ava', last_name: 'Jones', is_checked_in: true },
-    { id: '6', first_name: 'Ethan', last_name: 'Garcia', is_checked_in: false },
-  ]);
+  const [children, setChildren] = useState<Child[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showExitModal, setShowExitModal] = useState(false);
   const [passcode, setPasscode] = useState('');
   const [passcodeError, setPasscodeError] = useState('');
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Fetch children and today's attendance
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch both children and today's attendance in parallel
+        const [childrenResponse, attendanceRecords] = await Promise.all([
+          childrenService.getChildren({ is_active: true }),
+          attendanceService.getTodayAttendance()
+        ]);
+
+        // Create a map of child_id to attendance record
+        const attendanceMap = new Map(
+          attendanceRecords.map(record => [record.child_id, record])
+        );
+
+        // Map children with check-in status
+        const childrenWithCheckInStatus = childrenResponse.children.map(child => {
+          const attendance = attendanceMap.get(child.id);
+          return {
+            id: child.id,
+            first_name: child.first_name,
+            last_name: child.last_name,
+            photo_url: child.photo_url,
+            is_checked_in: attendance ? !attendance.check_out_time : false,
+            attendance_id: attendance?.id,
+          };
+        });
+
+        setChildren(childrenWithCheckInStatus);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Correct passcode - in production, this should come from settings
   const ADMIN_PASSCODE = '1234';
@@ -39,23 +74,55 @@ export const CheckInKiosk: React.FC = () => {
     setShowConfirmModal(true);
   };
 
-  const handleCheckInOut = () => {
+  const handleCheckInOut = async () => {
     if (!selectedChild) return;
 
-    // Update child's check-in status
-    setChildren(prev =>
-      prev.map(child =>
-        child.id === selectedChild.id
-          ? { ...child, is_checked_in: !child.is_checked_in }
-          : child
-      )
-    );
+    try {
+      const currentTime = new Date().toTimeString().split(' ')[0]; // HH:MM:SS format
 
-    // Close modal
-    setShowConfirmModal(false);
-    setSelectedChild(null);
+      if (selectedChild.is_checked_in) {
+        // Check out the child
+        if (selectedChild.attendance_id) {
+          await attendanceService.checkOut(selectedChild.attendance_id, {
+            check_out_time: currentTime,
+            check_out_by_name: 'Kiosk User', // In production, get actual name
+          });
 
-    // Show success message (could add toast notification here)
+          // Update local state
+          setChildren(prev =>
+            prev.map(child =>
+              child.id === selectedChild.id
+                ? { ...child, is_checked_in: false, attendance_id: undefined }
+                : child
+            )
+          );
+        }
+      } else {
+        // Check in the child
+        const response = await attendanceService.checkIn({
+          child_id: selectedChild.id,
+          check_in_time: currentTime,
+          check_in_by_name: 'Kiosk User', // In production, get actual name
+        });
+
+        // Update local state with new attendance ID
+        setChildren(prev =>
+          prev.map(child =>
+            child.id === selectedChild.id
+              ? { ...child, is_checked_in: true, attendance_id: response.id }
+              : child
+          )
+        );
+      }
+
+      // Close modal
+      setShowConfirmModal(false);
+      setSelectedChild(null);
+    } catch (error: any) {
+      console.error('Error checking in/out:', error);
+      alert(error.response?.data?.detail || 'Failed to update attendance. Please try again.');
+      // Don't close modal on error so user can retry
+    }
   };
 
   const handleExitAttempt = () => {
@@ -123,8 +190,13 @@ export const CheckInKiosk: React.FC = () => {
       {/* Children Grid */}
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {filteredChildren.map((child) => (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {filteredChildren.map((child) => (
               <button
                 key={child.id}
                 onClick={() => handleChildClick(child)}
@@ -161,10 +233,11 @@ export const CheckInKiosk: React.FC = () => {
                   </p>
                 </div>
               </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
-          {filteredChildren.length === 0 && (
+          {!loading && filteredChildren.length === 0 && (
             <div className="text-center py-12">
               <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />

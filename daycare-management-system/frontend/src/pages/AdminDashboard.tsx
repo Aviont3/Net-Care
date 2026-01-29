@@ -1,19 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useAuth } from '@/context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { AddEditChildModal } from '@/components/children/AddEditChildModal';
+import { childrenService } from '@/services/childrenService';
 
 export const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showAddChildModal, setShowAddChildModal] = useState(false);
+  const [totalChildren, setTotalChildren] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch total children count
+  useEffect(() => {
+    const fetchChildren = async () => {
+      try {
+        const response = await childrenService.getChildren({ is_active: true });
+        setTotalChildren(response.total);
+      } catch (error) {
+        console.error('Error fetching children count:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChildren();
+  }, []);
 
   // Mock data - will be replaced with actual API calls
   const stats = [
     {
       name: 'Total Children',
-      value: '42',
+      value: loading ? '...' : totalChildren.toString(),
       change: '+4',
       changeType: 'increase',
       icon: (
@@ -299,9 +318,16 @@ export const AdminDashboard: React.FC = () => {
         child={null}
         isOpen={showAddChildModal}
         onClose={() => setShowAddChildModal(false)}
-        onSuccess={() => {
+        onSuccess={async () => {
           setShowAddChildModal(false);
-          // Optionally navigate to children page or show success message
+          // Refresh children count
+          try {
+            const response = await childrenService.getChildren({ is_active: true });
+            setTotalChildren(response.total);
+          } catch (error) {
+            console.error('Error refreshing children count:', error);
+          }
+          // Navigate to children page
           navigate('/children');
         }}
       />

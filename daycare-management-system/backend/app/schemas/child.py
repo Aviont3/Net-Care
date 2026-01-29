@@ -1,7 +1,7 @@
 # Children & Family Schemas
 # ============================================
 
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, field_validator
@@ -52,8 +52,8 @@ class ChildResponse(ChildBase):
     """Schema for child response"""
     id: UUID
     created_by: Optional[UUID] = None
-    created_at: date
-    updated_at: date
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -111,8 +111,8 @@ class ParentUpdate(BaseModel):
 class ParentResponse(ParentBase):
     """Schema for parent response"""
     id: UUID
-    created_at: date
-    updated_at: date
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -148,7 +148,7 @@ class ChildParentUpdate(BaseModel):
 class ChildParentResponse(ChildParentBase):
     """Schema for child-parent relationship response"""
     id: UUID
-    created_at: date
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -187,8 +187,8 @@ class EmergencyContactUpdate(BaseModel):
 class EmergencyContactResponse(EmergencyContactBase):
     """Schema for emergency contact response"""
     id: UUID
-    created_at: date
-    updated_at: date
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -231,8 +231,8 @@ class AuthorizedPickupUpdate(BaseModel):
 class AuthorizedPickupResponse(AuthorizedPickupBase):
     """Schema for authorized pickup response"""
     id: UUID
-    created_at: date
-    updated_at: date
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
