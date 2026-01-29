@@ -10,6 +10,8 @@ build/
 *.egg
 
 # Virtual Environment
+
+backend/.venv/
 .venv/
 venv/
 ENV/
@@ -43,7 +45,7 @@ htmlcov/
 .tox/
 
 # Frontend
-node_modules/
+frontend/node_modules/
 dist/
 .cache/
 *.local

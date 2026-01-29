@@ -1,6 +1,6 @@
 # Application Configuration
 
-from typing import List
+from typing import List, Union
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-east-1"
     
     # CORS
-    BACKEND_CORS_ORIGINS: str | List[str] = "http://localhost:5173,http://localhost:3000,http://localhost:8000"
+    BACKEND_CORS_ORIGINS: Union[str, List[str]] = "http://localhost:5173,http://localhost:3000,http://localhost:8000"
 
     # Daycare-specific settings
     DAYCARE_NAME: str = "Netta's Bounce Around Daycare LLC"
@@ -68,11 +68,11 @@ class Settings(BaseSettings):
 
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = 10
-    ALLOWED_FILE_EXTENSIONS: str | List[str] = ".pdf,.jpg,.jpeg,.png,.doc,.docx"
+    ALLOWED_FILE_EXTENSIONS: Union[str, List[str]] = ".pdf,.jpg,.jpeg,.png,.doc,.docx"
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
-    def assemble_cors_origins(cls, v: str | List[str]) -> List[str]:
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
         if isinstance(v, str) and v:
             return [i.strip() for i in v.split(",")]
         elif isinstance(v, list):
@@ -81,7 +81,7 @@ class Settings(BaseSettings):
 
     @field_validator("ALLOWED_FILE_EXTENSIONS", mode="before")
     @classmethod
-    def assemble_file_extensions(cls, v: str | List[str]) -> List[str]:
+    def assemble_file_extensions(cls, v: Union[str, List[str]]) -> List[str]:
         if isinstance(v, str) and v:
             return [i.strip() for i in v.split(",")]
         elif isinstance(v, list):

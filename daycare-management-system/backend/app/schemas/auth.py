@@ -2,7 +2,8 @@
 # ============================================
 
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from uuid import UUID
+from pydantic import BaseModel, EmailStr, field_serializer
 
 
 class Token(BaseModel):
@@ -33,12 +34,16 @@ class UserCreate(BaseModel):
 
 class UserResponse(BaseModel):
     """User response schema"""
-    id: str
+    id: UUID
     email: str
     first_name: str
     last_name: str
     role: str
     is_active: bool
+
+    @field_serializer('id')
+    def serialize_id(self, value: UUID) -> str:
+        return str(value)
 
     class Config:
         from_attributes = True
