@@ -8,6 +8,7 @@ import { CheckInKiosk } from '@/pages/CheckInKiosk';
 import { ChildrenPage } from '@/pages/ChildrenPage';
 import { AttendanceCalendar } from '@/pages/AttendanceCalendar';
 import { ParentsPage } from '@/pages/ParentsPage';
+import { ActivitiesPage } from '@/pages/ActivitiesPage';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 function App() {
@@ -52,11 +53,7 @@ function App() {
             path="/activities"
             element={
               <ProtectedRoute>
-                <PlaceholderPage
-                  title="Daily Activities"
-                  description="Log and track daily activities, meals, naps, and more."
-                  icon={<svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                />
+                <ActivitiesPage />
               </ProtectedRoute>
             }
           />
