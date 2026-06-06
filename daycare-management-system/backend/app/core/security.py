@@ -2,6 +2,7 @@
 # ============================================
 # Fixed dependency injection for get_current_user
 
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 import bcrypt
@@ -11,6 +12,8 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.database import get_db
+
+logger = logging.getLogger(__name__)
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login")
@@ -86,9 +89,7 @@ async def get_current_user(
     """
     from app.models.user import User
 
-    print(f"DEBUG: get_current_user called")
-    print(f"DEBUG: token: {token[:30] if token else 'None'}...")
-    print(f"DEBUG: db session: {db}")
+    logger.debug("get_current_user called")
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -97,29 +98,26 @@ async def get_current_user(
     )
 
     payload = decode_access_token(token)
-    print(f"DEBUG: decoded payload: {payload}")
     if payload is None:
-        print("DEBUG: payload is None, raising 401")
+        logger.warning("Invalid token - payload decode failed")
         raise credentials_exception
 
     email: str = payload.get("sub")
-    print(f"DEBUG: email from token: {email}")
     if email is None:
-        print("DEBUG: email is None, raising 401")
+        logger.warning("Token contains no subject claim")
         raise credentials_exception
 
     user = db.query(User).filter(User.email == email).first()
-    print(f"DEBUG: user query result: {user}")
     if user is None:
-        print("DEBUG: user not found in database, raising 401")
+        logger.warning("User not found for email in token")
         raise credentials_exception
 
     if not user.is_active:
-        print("DEBUG: user is not active, raising 403")
+        logger.warning("Inactive user attempted access: %s", email)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive"
         )
 
-    print(f"DEBUG: returning user: {user.email}")
+    logger.debug("Authentication successful for: %s", email)
     return user

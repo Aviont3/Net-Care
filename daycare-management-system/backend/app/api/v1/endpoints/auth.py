@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, Token, UserCreate, UserResponse
-from app.core.security import verify_password, get_password_hash, create_access_token, get_current_user
+from app.core.security import verify_password, get_password_hash, create_access_token
 from app.core.config import settings
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_current_admin_user
 
 router = APIRouter()
 
@@ -47,11 +47,12 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    """
-    Register new staff user (admin only in production).
-    For now, open for initial setup.
-    """
+async def register(
+    user_data: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Register a new user (admin only)."""
     # Check if email already exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
