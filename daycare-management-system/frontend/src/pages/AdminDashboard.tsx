@@ -3,38 +3,36 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useAuth } from '@/context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { AddEditChildModal } from '@/components/children/AddEditChildModal';
-import { childrenService } from '@/services/childrenService';
+import { dashboardService, type DashboardSummary } from '@/services/dashboardService';
 
 export const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showAddChildModal, setShowAddChildModal] = useState(false);
-  const [totalChildren, setTotalChildren] = useState<number>(0);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch total children count
-  useEffect(() => {
-    const fetchChildren = async () => {
-      try {
-        const response = await childrenService.getChildren({ is_active: true });
-        setTotalChildren(response.total);
-      } catch (error) {
-        console.error('Error fetching children count:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchSummary = async () => {
+    try {
+      const data = await dashboardService.getSummary();
+      setSummary(data);
+    } catch (error) {
+      console.error('Error fetching dashboard summary:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchChildren();
-  }, []);
+  useEffect(() => { fetchSummary(); }, []);
 
-  // Mock data - will be replaced with actual API calls
+  const fmt = (n: number | undefined) => loading ? '...' : (n ?? 0).toString();
+
   const stats = [
     {
       name: 'Total Children',
-      value: loading ? '...' : totalChildren.toString(),
-      change: '+4',
-      changeType: 'increase',
+      value: fmt(summary?.total_children),
+      change: '',
+      changeType: 'neutral',
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -44,8 +42,8 @@ export const AdminDashboard: React.FC = () => {
     },
     {
       name: 'Present Today',
-      value: '38',
-      change: '90%',
+      value: fmt(summary?.present_today),
+      change: summary ? `${summary.attendance_percentage}%` : '',
       changeType: 'neutral',
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -56,8 +54,8 @@ export const AdminDashboard: React.FC = () => {
     },
     {
       name: 'Staff On Duty',
-      value: '12',
-      change: '100%',
+      value: fmt(summary?.staff_on_duty),
+      change: '',
       changeType: 'neutral',
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -68,9 +66,9 @@ export const AdminDashboard: React.FC = () => {
     },
     {
       name: 'Pending Alerts',
-      value: '3',
-      change: '-2',
-      changeType: 'decrease',
+      value: fmt(summary?.pending_alerts),
+      change: '',
+      changeType: 'neutral',
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -320,14 +318,7 @@ export const AdminDashboard: React.FC = () => {
         onClose={() => setShowAddChildModal(false)}
         onSuccess={async () => {
           setShowAddChildModal(false);
-          // Refresh children count
-          try {
-            const response = await childrenService.getChildren({ is_active: true });
-            setTotalChildren(response.total);
-          } catch (error) {
-            console.error('Error refreshing children count:', error);
-          }
-          // Navigate to children page
+          await fetchSummary();
           navigate('/children');
         }}
       />
