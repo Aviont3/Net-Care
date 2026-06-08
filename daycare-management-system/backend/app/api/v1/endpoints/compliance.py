@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.compliance import EnrollmentForm, ImmunizationRecord, StaffCredential
+from app.models.compliance_monitoring import ComplianceAlert
 from app.models.child import Child
 from app.models.user import User
 from app.schemas.compliance import (
@@ -615,3 +616,115 @@ async def get_expired_credentials(
             })
 
     return expired_list
+
+
+# ============================================
+# BULK LIST ROUTES (needed by frontend dashboard)
+# ============================================
+
+@router.get("/immunizations/", response_model=List[ImmunizationRecordResponse])
+async def get_all_immunizations(
+    child_id: Optional[UUID] = Query(None),
+    is_verified: Optional[bool] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all immunization records, optionally filtered."""
+    q = db.query(ImmunizationRecord)
+    if child_id:
+        q = q.filter(ImmunizationRecord.child_id == child_id)
+    if is_verified is not None:
+        q = q.filter(ImmunizationRecord.is_verified == is_verified)
+    return q.order_by(ImmunizationRecord.expiration_date.asc().nullslast())\
+            .offset((page - 1) * page_size).limit(page_size).all()
+
+
+@router.get("/staff-credentials/", response_model=List[StaffCredentialResponse])
+async def get_all_credentials(
+    is_expired: Optional[bool] = Query(None),
+    is_verified: Optional[bool] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all staff credentials, optionally filtered."""
+    q = db.query(StaffCredential)
+    if is_expired is not None:
+        q = q.filter(StaffCredential.is_expired == is_expired)
+    if is_verified is not None:
+        q = q.filter(StaffCredential.is_verified == is_verified)
+    return q.order_by(StaffCredential.expiration_date.asc().nullslast())\
+            .offset((page - 1) * page_size).limit(page_size).all()
+
+
+# ============================================
+# VERIFY ACTIONS
+# ============================================
+
+@router.patch("/immunizations/{record_id}/verify", response_model=ImmunizationRecordResponse)
+async def verify_immunization(
+    record_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    record = db.query(ImmunizationRecord).filter(ImmunizationRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
+    record.is_verified = True
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+@router.patch("/staff-credentials/{credential_id}/verify", response_model=StaffCredentialResponse)
+async def verify_credential(
+    credential_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    credential = db.query(StaffCredential).filter(StaffCredential.id == credential_id).first()
+    if not credential:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credential not found")
+    credential.is_verified = True
+    db.commit()
+    db.refresh(credential)
+    return credential
+
+
+# ============================================
+# COMPLIANCE ALERTS
+# ============================================
+
+@router.get("/alerts/")
+async def get_alerts(
+    is_resolved: Optional[bool] = Query(None),
+    severity: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    q = db.query(ComplianceAlert)
+    if is_resolved is not None:
+        q = q.filter(ComplianceAlert.is_resolved == is_resolved)
+    if severity:
+        q = q.filter(ComplianceAlert.severity == severity)
+    return q.order_by(ComplianceAlert.due_date.asc().nullslast()).limit(200).all()
+
+
+@router.patch("/alerts/{alert_id}/resolve")
+async def resolve_alert(
+    alert_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from datetime import datetime
+    alert = db.query(ComplianceAlert).filter(ComplianceAlert.id == alert_id).first()
+    if not alert:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+    alert.is_resolved = True
+    alert.resolved_at = datetime.utcnow()
+    db.commit()
+    db.refresh(alert)
+    return alert
