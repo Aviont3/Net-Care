@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
-from app.schemas.auth import LoginRequest, Token, UserCreate, UserResponse
-from app.core.security import verify_password, get_password_hash, create_access_token
+from app.schemas.auth import LoginRequest, Token, RefreshRequest, UserCreate, UserResponse
+from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token, decode_refresh_token
 from app.core.config import settings
 from app.dependencies import get_current_user, get_current_admin_user
 
@@ -43,7 +43,52 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         expires_delta=access_token_expires
     )
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Create refresh token for token rotation
+    refresh_token = create_refresh_token(data={"sub": user.email})
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token(request: RefreshRequest, db: Session = Depends(get_db)):
+    """
+    Token rotation endpoint.
+    Exchange a valid refresh token for a new access + refresh token pair.
+    Old refresh token is invalidated (single-use rotation).
+    """
+    payload = decode_refresh_token(request.refresh_token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    email = payload.get("sub")
+    user = db.query(User).filter(User.email == email).first()
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+        )
+    
+    # Issue new token pair (rotation)
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    new_access_token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=access_token_expires
+    )
+    new_refresh_token = create_refresh_token(data={"sub": user.email})
+    
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer"
+    }
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

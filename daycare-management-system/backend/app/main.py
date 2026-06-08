@@ -6,6 +6,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.middleware.security import RateLimitMiddleware, SecurityHeadersMiddleware, CSRFMiddleware
 from app.api.v1.router import api_router
 
 app = FastAPI(
@@ -22,6 +23,16 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Security Middleware — rate limiting and security headers
+# Order matters: SecurityHeaders wraps the response, RateLimit checks before processing
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(CSRFMiddleware)
+app.add_middleware(
+    RateLimitMiddleware,
+    requests_per_minute=100,
+    login_requests_per_minute=5,
 )
 
 # Include API routes
