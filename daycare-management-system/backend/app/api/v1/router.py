@@ -15,7 +15,8 @@ from app.api.v1.endpoints import (
     medications,
     dashboard,
     reports,
-    parent_portal
+    parent_portal,
+    enrollment
 )
 
 api_router = APIRouter()
@@ -34,3 +35,4 @@ api_router.include_router(medications.router, prefix="/medications", tags=["Medi
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 api_router.include_router(reports.router, prefix="/reports", tags=["Daily Reports"])
 api_router.include_router(parent_portal.router, prefix="/parent", tags=["Parent Portal"])
+api_router.include_router(enrollment.router, prefix="/enrollment", tags=["Enrollment"])
