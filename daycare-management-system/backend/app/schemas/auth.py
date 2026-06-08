@@ -18,6 +18,12 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class ParentActivateRequest(BaseModel):
+    """Parent account activation request"""
+    invite_code: str
+    password: str
+
+
 class TokenData(BaseModel):
     """Token payload data"""
     email: Optional[str] = None

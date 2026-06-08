@@ -1,4 +1,5 @@
 from typing import List, Optional
+import secrets
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -87,7 +88,11 @@ async def enroll_family(
         # 1. Create guardian (Parent) records
         created_parents: List[Parent] = []
         for g in payload.guardians:
-            parent = Parent(**g.model_dump())
+            parent_data = g.model_dump()
+            # Auto-generate invite code for parents with email addresses
+            if parent_data.get("email"):
+                parent_data["invite_code"] = secrets.token_urlsafe(32)
+            parent = Parent(**parent_data)
             db.add(parent)
             db.flush()  # get .id without committing
             created_parents.append(parent)
@@ -128,7 +133,13 @@ async def enroll_family(
 
         return {
             "message": "Family enrolled successfully",
-            "guardians": [{"id": str(p.id), "name": f"{p.first_name} {p.last_name}"} for p in created_parents],
+            "guardians": [
+                {
+                    "id": str(p.id),
+                    "name": f"{p.first_name} {p.last_name}",
+                    "invite_code": p.invite_code,
+                } for p in created_parents
+            ],
             "children": [{"id": str(c.id), "name": f"{c.first_name} {c.last_name}"} for c in created_children],
         }
 

@@ -65,3 +65,18 @@ async def get_current_admin_user(
             detail="Not enough permissions. Admin access required."
         )
     return current_user
+
+
+async def get_current_staff_or_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """
+    Dependency to ensure current user is staff or admin (not a parent).
+    Usage: user: User = Depends(get_current_staff_or_admin)
+    """
+    if current_user.role not in ("admin", "staff"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Staff or admin access required."
+        )
+    return current_user

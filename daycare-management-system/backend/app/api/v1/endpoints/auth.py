@@ -1,17 +1,21 @@
 # Authentication Endpoints (Login, Register)
 # ============================================
 
+import logging
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
-from app.schemas.auth import LoginRequest, Token, RefreshRequest, UserCreate, UserResponse
+from app.models.child import Parent
+from app.schemas.auth import LoginRequest, Token, RefreshRequest, ParentActivateRequest, UserCreate, UserResponse
 from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token, decode_refresh_token
 from app.core.config import settings
 from app.dependencies import get_current_user, get_current_admin_user
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 
 @router.post("/login", response_model=Token)
@@ -89,6 +93,114 @@ async def refresh_token(request: RefreshRequest, db: Session = Depends(get_db)):
         "refresh_token": new_refresh_token,
         "token_type": "bearer"
     }
+
+
+@router.post("/setup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def initial_setup(user_data: UserCreate, db: Session = Depends(get_db)):
+    """
+    One-time setup endpoint to create the first admin user.
+    Only works when no users exist in the database.
+    """
+    existing_users = db.query(User).count()
+    if existing_users > 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Setup already completed. Use /register with admin credentials."
+        )
+
+    # Force first user to be admin regardless of what's submitted
+    new_user = User(
+        email=user_data.email,
+        password_hash=get_password_hash(user_data.password),
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
+        role="admin",
+        is_active=True,
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    logger.info("Initial admin user created: %s", new_user.email)
+
+    return UserResponse(
+        id=str(new_user.id),
+        email=new_user.email,
+        first_name=new_user.first_name,
+        last_name=new_user.last_name,
+        role=new_user.role,
+        is_active=new_user.is_active
+    )
+
+
+@router.post("/parent/activate", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def activate_parent_account(
+    request: ParentActivateRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Parent account activation.
+    Parents use their invite code (generated during enrollment) to create
+    a user account with role='parent' linked to their Parent record.
+    """
+    # Find parent by invite code
+    parent = db.query(Parent).filter(Parent.invite_code == request.invite_code).first()
+    if parent is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid invite code"
+        )
+
+    if parent.user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account already activated"
+        )
+
+    if not parent.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Parent record has no email address"
+        )
+
+    # Check if a user with this email already exists
+    existing_user = db.query(User).filter(User.email == parent.email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A user with this email already exists"
+        )
+
+    # Create user account for parent
+    new_user = User(
+        email=parent.email,
+        password_hash=get_password_hash(request.password),
+        first_name=parent.first_name,
+        last_name=parent.last_name,
+        role="parent",
+        is_active=True,
+    )
+    db.add(new_user)
+    db.flush()
+
+    # Link parent record to user account and clear invite code (single-use)
+    parent.user_id = new_user.id
+    parent.invite_code = None
+
+    db.commit()
+    db.refresh(new_user)
+
+    logger.info("Parent account activated: %s", new_user.email)
+
+    return UserResponse(
+        id=str(new_user.id),
+        email=new_user.email,
+        first_name=new_user.first_name,
+        last_name=new_user.last_name,
+        role=new_user.role,
+        is_active=new_user.is_active
+    )
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

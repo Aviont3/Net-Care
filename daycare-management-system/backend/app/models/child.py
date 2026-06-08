@@ -55,6 +55,8 @@ class Parent(BaseModel):
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100), nullable=False)
     email = Column(String(255), index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
+    invite_code = Column(String(64), unique=True, nullable=True, index=True)
     phone_primary = Column(String(20), nullable=False, index=True)
     phone_secondary = Column(String(20))
     address_street = Column(String(255))
@@ -67,6 +69,7 @@ class Parent(BaseModel):
 
     # Relationships
     children = relationship("ChildParent", back_populates="parent", cascade="all, delete-orphan")
+    user = relationship("User", foreign_keys=[user_id])
 
     def __repr__(self):
         return f"<Parent {self.first_name} {self.last_name}>"
