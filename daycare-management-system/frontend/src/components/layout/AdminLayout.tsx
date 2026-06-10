@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AdminSidebar } from './AdminSidebar';
+import { MobileBottomNav } from './MobileBottomNav';
 import { useAuth } from '@/context/AuthContext';
 
 interface AdminLayoutProps {
@@ -64,11 +65,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Content Area - Padding for fixed header and sidebar */}
-      <main className="pt-16 lg:pl-64 min-h-screen">
+      <main className="pt-16 pb-20 md:pb-0 lg:pl-64 min-h-screen">
         <div className="py-6 px-4 sm:px-6 lg:px-8">
           {children}
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav />
 
       {/* Footer */}
       <footer className="lg:pl-64 bg-white border-t border-gray-200">

@@ -49,6 +49,7 @@ class Activity(BaseModel):
     mood = Column(String(50))  # happy, sad, energetic, tired, cranky, neutral
     duration_minutes = Column(Integer)
     notes = Column(Text)
+    photo_url = Column(String(500))  # Optional photo attachment URL
     logged_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
     # Relationships

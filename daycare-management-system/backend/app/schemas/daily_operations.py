@@ -4,7 +4,7 @@
 from datetime import date, datetime, time
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, model_validator
 
 
 # ============================================
@@ -69,11 +69,21 @@ class ActivityBase(BaseModel):
     mood: Optional[str] = None  # happy, sad, energetic, tired, cranky, neutral
     duration_minutes: Optional[int] = None
     notes: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 class ActivityCreate(ActivityBase):
-    """Schema for creating an activity"""
-    pass
+    """Schema for creating an activity. Date/time default to now if not provided."""
+    activity_date: Optional[date] = None
+    activity_time: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def set_defaults(self):
+        if self.activity_date is None:
+            self.activity_date = date.today()
+        if self.activity_time is None:
+            self.activity_time = datetime.now()
+        return self
 
 
 class ActivityUpdate(BaseModel):
@@ -84,6 +94,7 @@ class ActivityUpdate(BaseModel):
     mood: Optional[str] = None
     duration_minutes: Optional[int] = None
     notes: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 class ActivityResponse(ActivityBase):

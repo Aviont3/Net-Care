@@ -1,10 +1,12 @@
 # Activities Management Endpoints
 # ============================================
 
+import os
+import uuid as uuid_lib
 from datetime import date, datetime
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
@@ -57,16 +59,23 @@ async def create_activity(
                 detail=f"Invalid mood. Must be one of: {', '.join(valid_moods)}"
             )
 
-    new_activity = Activity(
-        **activity_data.model_dump(),
-        logged_by=current_user.id
-    )
+    try:
+        new_activity = Activity(
+            **activity_data.model_dump(),
+            logged_by=current_user.id
+        )
 
-    db.add(new_activity)
-    db.commit()
-    db.refresh(new_activity)
+        db.add(new_activity)
+        db.commit()
+        db.refresh(new_activity)
 
-    return new_activity
+        return new_activity
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating activity: {str(e)}"
+        )
 
 
 @router.get("/", response_model=List[ActivityResponse])
@@ -364,3 +373,58 @@ async def delete_activity(
     db.commit()
 
     return None
+
+
+# ============================================
+# PHOTO UPLOAD
+# ============================================
+
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "uploads", "activities")
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+
+@router.post("/{activity_id}/photo", response_model=ActivityResponse)
+async def upload_activity_photo(
+    activity_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Upload a photo attachment for an activity log.
+    Max 1 photo per activity. Uploading again replaces the previous photo.
+    Accepts: jpg, jpeg, png, gif, webp, heic (max 10MB).
+    """
+    # Verify activity exists
+    activity = db.query(Activity).filter(Activity.id == activity_id).first()
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    # Validate file extension
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # Read and validate size
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="File too large. Max 10MB.")
+
+    # Save file
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    filename = f"{uuid_lib.uuid4().hex}{ext}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    # Update activity with photo URL
+    photo_url = f"/uploads/activities/{filename}"
+    activity.photo_url = photo_url
+    db.commit()
+    db.refresh(activity)
+
+    return activity

@@ -21,13 +21,24 @@ async def generate_daily_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Generate (or regenerate) the AI daily report for a child on a given date."""
+    """Generate (or regenerate) the AI daily report for a child on a given date.
+
+    Set `use_llm=True` in the request body to use GPT-4 narrative generation.
+    Optionally specify `tone`: "warm" (default), "professional", or "brief".
+    """
     child = db.query(Child).filter(Child.id == payload.child_id).first()
     if not child:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child not found")
 
     try:
-        result = ai_service.generate_report(db, payload.child_id, payload.report_date)
+        result = await ai_service.generate_report(
+            db,
+            payload.child_id,
+            payload.report_date,
+            use_llm=payload.use_llm,
+            tone=payload.tone,
+            center_id=str(current_user.id),  # Use user/org ID for rate limiting
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 

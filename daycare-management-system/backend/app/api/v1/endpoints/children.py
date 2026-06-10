@@ -46,7 +46,7 @@ async def create_child(
 @router.get("/", response_model=ChildListResponse)
 async def get_children(
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    page_size: int = Query(20, ge=1, le=200, description="Items per page"),
     search: Optional[str] = Query(None, description="Search by name"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     db: Session = Depends(get_db),
@@ -56,9 +56,6 @@ async def get_children(
     Get paginated list of children.
     Supports search and filtering.
     """
-    print("DEBUG: get_children endpoint called!")
-    print(f"DEBUG: current_user in endpoint: {current_user.email if current_user else 'None'}")
-
     query = db.query(Child)
 
     # Apply filters

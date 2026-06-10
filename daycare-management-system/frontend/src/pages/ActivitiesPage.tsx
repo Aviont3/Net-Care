@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { AdminLayout } from '@/components/layout/AdminLayout';
+
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
 import { childrenService } from '@/services/childrenService';
 import { activityService, type Activity, type ActivityCreate } from '@/services/activityService';
 import type { Child } from '@/types';
@@ -99,9 +101,22 @@ export const ActivitiesPage: React.FC = () => {
         description: form.description || undefined,
         notes: form.notes || undefined,
       };
-      await activityService.createActivity(payload);
+      const created = await activityService.createActivity(payload);
+
+      // Upload photo if one was selected
+      if (photoFile && created.id) {
+        try {
+          await activityService.uploadPhoto(created.id, photoFile);
+        } catch {
+          // Activity was created but photo upload failed — non-blocking
+          console.warn('Photo upload failed');
+        }
+      }
+
       setSuccess('Activity logged successfully!');
       setForm(EMPTY_FORM);
+      setPhotoFile(null);
+      setPhotoPreview(null);
       await fetchActivities();
       setTimeout(() => setSuccess(''), 3000);
     } catch {
@@ -202,6 +217,35 @@ export const ActivitiesPage: React.FC = () => {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
           </div>
 
+          {/* Photo Attachment */}
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Photo (optional)</label>
+            <div className="flex items-center gap-3">
+              <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-700 transition-colors">
+                <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                {photoFile ? 'Change Photo' : 'Add Photo'}
+                <input type="file" accept="image/*" capture="environment" className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setPhotoFile(file);
+                      setPhotoPreview(URL.createObjectURL(file));
+                    }
+                  }} />
+              </label>
+              {photoPreview && (
+                <div className="relative">
+                  <img src={photoPreview} alt="Preview" className="w-16 h-16 object-cover rounded-lg border" />
+                  <button type="button" onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">×</button>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="sm:col-span-2 lg:col-span-3 flex justify-end">
             <button type="submit" disabled={submitting}
               className="px-6 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors">
@@ -254,6 +298,9 @@ export const ActivitiesPage: React.FC = () => {
                   </div>
                   {a.description && <p className="text-sm text-gray-600 mt-0.5">{a.description}</p>}
                   {a.notes && <p className="text-xs text-gray-500 mt-0.5 italic">{a.notes}</p>}
+                  {a.photo_url && (
+                    <img src={a.photo_url} alt="Activity photo" className="mt-2 w-32 h-24 object-cover rounded-lg border border-gray-200 shadow-sm" />
+                  )}
                   <div className="flex flex-wrap gap-x-3 mt-1 text-xs text-gray-400">
                     <span>{formatTime(a.activity_time)}</span>
                     {a.duration_minutes && <span>{a.duration_minutes} min</span>}

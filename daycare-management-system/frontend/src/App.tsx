@@ -11,6 +11,7 @@ import { ParentsPage } from '@/pages/ParentsPage';
 import { ActivitiesPage } from '@/pages/ActivitiesPage';
 import { IncidentsPage } from '@/pages/IncidentsPage';
 import { MedicationsPage } from '@/pages/MedicationsPage';
+import { CalendarPage } from '@/pages/CalendarPage';
 import { ParentDashboard } from '@/pages/parent/ParentDashboard';
 import { CompliancePage } from '@/pages/CompliancePage';
 import { EnrollFamilyWizard } from '@/pages/EnrollFamilyWizard';
@@ -50,6 +51,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <AttendanceCalendar />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <CalendarPage />
               </ProtectedRoute>
             }
           />

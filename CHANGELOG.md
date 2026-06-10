@@ -7,6 +7,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased] — feature/security-hardening-week1
 
+### 2026-06-08 — Security Issues #8 & #9 Closed
+
+#### ✅ Completed
+
+**Issue #8: Add CSRF protection to all forms**
+- Implemented CSRF token generation and validation middleware
+- All state-changing forms now include and verify CSRF tokens
+- Protects against cross-site request forgery attacks
+
+**Issue #9: Implement session timeout & token rotation**
+- Sessions now expire after inactivity period
+- Refresh tokens are rotated on each use (one-time use tokens)
+- Expired sessions require re-authentication
+
+---
+
 ### 2026-06-06 — Security Hardening Sprint Started
 
 #### ✅ Completed
@@ -35,8 +51,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 **Todo (security hardening):**
 - #6: Implement HTTPS-only with HSTS headers
 - #7: Set up rate limiting on login & API endpoints
-- #8: Add CSRF protection to all forms
-- #9: Implement session timeout & token rotation
+- ~~#8: Add CSRF protection to all forms~~ ✅
+- ~~#9: Implement session timeout & token rotation~~ ✅
 - #10: Configure CORS policy (allow only trusted origins)
 - #11: Add security response headers (CSP, X-Frame-Options, etc.)
 - #12: Write security audit tests (OWASP Top 10 coverage)

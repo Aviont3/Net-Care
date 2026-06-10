@@ -11,6 +11,7 @@ export interface Activity {
   mood?: string;
   duration_minutes?: number;
   notes?: string;
+  photo_url?: string;
   logged_by: string;
   created_at: string;
 }
@@ -36,6 +37,14 @@ export const activityService = {
   },
   async createActivity(data: ActivityCreate) {
     const response = await api.post<Activity>('/api/v1/activities/', data);
+    return response.data;
+  },
+  async uploadPhoto(activityId: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<Activity>(`/api/v1/activities/${activityId}/photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data;
   },
 };

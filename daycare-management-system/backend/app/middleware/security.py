@@ -69,6 +69,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
     async def dispatch(self, request: Request, call_next):
+        # Let CORS preflight through — OPTIONS must be handled by CORSMiddleware
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         if request.method in self.UNSAFE_METHODS:
             origin = request.headers.get("origin")
             referer = request.headers.get("referer")

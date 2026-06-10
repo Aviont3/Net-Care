@@ -2,7 +2,7 @@
 # ============================================
 
 from datetime import date, datetime
-from typing import Optional, Dict, Any
+from typing import Literal, Optional, Dict, Any
 from uuid import UUID
 from pydantic import BaseModel
 
@@ -53,9 +53,15 @@ class DailyReportResponse(DailyReportBase):
 
 
 class DailyReportGenerate(BaseModel):
-    """Schema for triggering AI generation of daily report"""
+    """Schema for triggering AI generation of daily report.
+
+    Set use_llm=True to generate a GPT-4 powered narrative instead of
+    the default template-based report.
+    """
     child_id: UUID
     report_date: date
+    use_llm: bool = False
+    tone: Literal["warm", "professional", "brief"] = "warm"
 
 
 # ============================================
