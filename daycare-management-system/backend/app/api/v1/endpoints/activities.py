@@ -20,6 +20,7 @@ from app.schemas.daily_operations import (
     ActivityResponse,
 )
 from app.core.security import get_current_user
+from app.services.cacfp_validator import validate_meal
 
 router = APIRouter()
 
@@ -64,6 +65,16 @@ async def create_activity(
             **activity_data.model_dump(),
             logged_by=current_user.id
         )
+
+        # Auto-validate CACFP compliance when meal_type + food_components are present
+        if (
+            new_activity.activity_type == "meal"
+            and new_activity.meal_type
+            and new_activity.food_components
+        ):
+            result = validate_meal(new_activity.meal_type, new_activity.food_components)
+            new_activity.cacfp_compliant = result["compliant"]
+            new_activity.compliance_notes = result["notes"] if not result["compliant"] else None
 
         db.add(new_activity)
         db.commit()

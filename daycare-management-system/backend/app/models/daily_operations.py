@@ -1,7 +1,7 @@
 # Daily Operations Models
 # ============================================
 
-from sqlalchemy import Column, String, Date, Boolean, Text, ForeignKey, Integer, Time, DateTime
+from sqlalchemy import Column, String, Date, Boolean, Text, ForeignKey, Integer, Time, DateTime, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
@@ -44,6 +44,10 @@ class Activity(BaseModel):
     activity_date = Column(Date, nullable=False, index=True)
     activity_time = Column(DateTime, nullable=False)
     activity_type = Column(String(50), nullable=False, index=True)  # meal, nap, diaper, play, learning, outdoor
+    meal_type = Column(String(20))  # breakfast, lunch, supper, snack — only used when activity_type="meal"
+    food_components = Column(JSON)  # {"milk": true, "grains": "Whole wheat bread", "fruit": "Apple slices", "vegetable": null, "meat_alternate": null}
+    cacfp_compliant = Column(Boolean)  # Auto-calculated by USDA meal pattern validator
+    compliance_notes = Column(Text)  # Why it failed (if applicable)
     activity_name = Column(String(255), nullable=False)
     description = Column(Text)
     mood = Column(String(50))  # happy, sad, energetic, tired, cranky, neutral

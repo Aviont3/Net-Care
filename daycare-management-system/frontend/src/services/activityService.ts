@@ -6,12 +6,16 @@ export interface Activity {
   activity_date: string;
   activity_time: string;
   activity_type: string;
+  meal_type?: string;
   activity_name: string;
   description?: string;
   mood?: string;
   duration_minutes?: number;
   notes?: string;
   photo_url?: string;
+  food_components?: Record<string, string | boolean | null>;
+  cacfp_compliant?: boolean | null;
+  compliance_notes?: string | null;
   logged_by: string;
   created_at: string;
 }
@@ -19,11 +23,13 @@ export interface Activity {
 export interface ActivityCreate {
   child_id: string;
   activity_type: string;
+  meal_type?: string;
   activity_name: string;
   description?: string;
   mood?: string;
   duration_minutes?: number;
   notes?: string;
+  food_components?: Record<string, string | boolean | null>;
 }
 
 export const activityService = {

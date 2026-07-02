@@ -26,8 +26,34 @@ const TYPE_COLORS: Record<string, string> = {
   outdoor: 'bg-teal-100 text-teal-700',
 };
 
+const MEAL_TYPES = ['breakfast', 'lunch', 'supper', 'snack'] as const;
+const MEAL_TYPE_LABELS: Record<string, string> = {
+  breakfast: '🌅 Breakfast',
+  lunch: '☀️ Lunch',
+  supper: '🌙 Supper',
+  snack: '🍎 Snack',
+};
+
+// Food component keys expected by the CACFP validator
+const FOOD_COMPONENT_KEYS = ['milk', 'grains', 'fruit', 'vegetable', 'meat_alternate'] as const;
+type FoodComponentKey = typeof FOOD_COMPONENT_KEYS[number];
+
+const FOOD_COMPONENT_LABELS: Record<FoodComponentKey, string> = {
+  milk:          '🥛 Milk',
+  grains:        '🌾 Grains',
+  fruit:         '🍎 Fruit',
+  vegetable:     '🥦 Vegetable',
+  meat_alternate:'🍗 Meat / Alternate',
+};
+
+type FoodComponents = Record<FoodComponentKey, string>;
+
+const EMPTY_FOOD_COMPONENTS: FoodComponents = {
+  milk: '', grains: '', fruit: '', vegetable: '', meat_alternate: '',
+};
+
 const EMPTY_FORM: ActivityCreate = {
-  child_id: '', activity_type: 'meal', activity_name: '',
+  child_id: '', activity_type: 'meal', meal_type: '', activity_name: '',
   description: '', mood: '', duration_minutes: undefined, notes: '',
 };
 
@@ -39,6 +65,8 @@ export const ActivitiesPage: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [form, setForm] = useState<ActivityCreate>(EMPTY_FORM);
+  const [foodComponents, setFoodComponents] = useState<FoodComponents>(EMPTY_FOOD_COMPONENTS);
+  const [lastCompliance, setLastCompliance] = useState<{ compliant: boolean; notes: string } | null>(null);
   const [filterType, setFilterType] = useState('');
   const [filterChild, setFilterChild] = useState('');
 
@@ -85,7 +113,27 @@ export const ActivitiesPage: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setForm(f => ({ ...f, [name]: name === 'duration_minutes' ? (value ? Number(value) : undefined) : value }));
+    setForm(f => {
+      const updated = { ...f, [name]: name === 'duration_minutes' ? (value ? Number(value) : undefined) : value };
+      // Clear meal_type + food components when switching away from "meal" activity type
+      if (name === 'activity_type' && value !== 'meal') {
+        updated.meal_type = '';
+      }
+      return updated;
+    });
+    // Reset food components and compliance state when activity type or meal type changes
+    if (name === 'activity_type' && value !== 'meal') {
+      setFoodComponents(EMPTY_FOOD_COMPONENTS);
+      setLastCompliance(null);
+    }
+    if (name === 'meal_type') {
+      setFoodComponents(EMPTY_FOOD_COMPONENTS);
+      setLastCompliance(null);
+    }
+  };
+
+  const handleFoodComponentChange = (key: FoodComponentKey, value: string) => {
+    setFoodComponents(prev => ({ ...prev, [key]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,13 +143,33 @@ export const ActivitiesPage: React.FC = () => {
     setError('');
     setSubmitting(true);
     try {
+      // Build food_components: only include keys with a non-empty value
+      const hasComponents = form.activity_type === 'meal' && form.meal_type;
+      const builtComponents = hasComponents
+        ? Object.fromEntries(
+            FOOD_COMPONENT_KEYS.map(k => [k, foodComponents[k] || null])
+          )
+        : undefined;
+
       const payload: ActivityCreate = {
         ...form,
+        meal_type: form.meal_type || undefined,
         mood: form.mood || undefined,
         description: form.description || undefined,
         notes: form.notes || undefined,
+        food_components: builtComponents,
       };
       const created = await activityService.createActivity(payload);
+
+      // Surface compliance result from the API response
+      if (created.cacfp_compliant !== undefined && created.cacfp_compliant !== null) {
+        setLastCompliance({
+          compliant: created.cacfp_compliant,
+          notes: created.compliance_notes ?? '',
+        });
+      } else {
+        setLastCompliance(null);
+      }
 
       // Upload photo if one was selected
       if (photoFile && created.id) {
@@ -115,6 +183,7 @@ export const ActivitiesPage: React.FC = () => {
 
       setSuccess('Activity logged successfully!');
       setForm(EMPTY_FORM);
+      setFoodComponents(EMPTY_FOOD_COMPONENTS);
       setPhotoFile(null);
       setPhotoPreview(null);
       await fetchActivities();
@@ -172,6 +241,78 @@ export const ActivitiesPage: React.FC = () => {
               ))}
             </select>
           </div>
+
+          {/* Meal Type — only shown when activity_type is "meal" */}
+          {form.activity_type === 'meal' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Meal Type</label>
+              <select name="meal_type" value={form.meal_type ?? ''} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="">Not specified</option>
+                {MEAL_TYPES.map(m => (
+                  <option key={m} value={m}>{MEAL_TYPE_LABELS[m]}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Food Components — shown when meal type is selected (CACFP tracking) */}
+          {form.activity_type === 'meal' && form.meal_type && (
+            <div className="sm:col-span-2 lg:col-span-3">
+              <div className="border border-orange-200 rounded-lg p-4 bg-orange-50">
+                <h3 className="text-sm font-semibold text-orange-800 mb-3">
+                  🥗 CACFP Food Components
+                  <span className="ml-2 text-xs font-normal text-orange-600">
+                    Check the box and describe what was served for USDA reimbursement tracking
+                  </span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {FOOD_COMPONENT_KEYS.map(key => (
+                    <div key={key} className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        id={`fc_${key}`}
+                        checked={!!foodComponents[key]}
+                        onChange={e => handleFoodComponentChange(key, e.target.checked ? ' ' : '')}
+                        className="mt-2.5 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <label htmlFor={`fc_${key}`} className="block text-xs font-medium text-gray-700 mb-1 cursor-pointer">
+                          {FOOD_COMPONENT_LABELS[key]}
+                        </label>
+                        <input
+                          type="text"
+                          value={foodComponents[key]}
+                          onChange={e => handleFoodComponentChange(key, e.target.value)}
+                          placeholder={key === 'milk' ? 'e.g. Whole milk' : key === 'grains' ? 'e.g. Whole wheat bread' : key === 'fruit' ? 'e.g. Apple slices' : key === 'vegetable' ? 'e.g. Carrots' : 'e.g. Chicken'}
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400 disabled:bg-gray-50 disabled:text-gray-400"
+                          disabled={!foodComponents[key] && foodComponents[key] !== ' '}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Inline compliance badge — shown after last submission */}
+                {lastCompliance !== null && (
+                  <div className={`mt-3 flex items-start gap-2 p-2.5 rounded-lg text-xs font-medium ${
+                    lastCompliance.compliant
+                      ? 'bg-green-100 text-green-800 border border-green-200'
+                      : 'bg-red-100 text-red-800 border border-red-200'
+                  }`}>
+                    <span className="text-base leading-none shrink-0">
+                      {lastCompliance.compliant ? '✅' : '❌'}
+                    </span>
+                    <span>
+                      {lastCompliance.compliant
+                        ? 'CACFP compliant — all required components present.'
+                        : `Not CACFP compliant: ${lastCompliance.notes}`}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Activity Name */}
           <div>
@@ -295,6 +436,18 @@ export const ActivitiesPage: React.FC = () => {
                   <div className="flex flex-wrap items-baseline gap-x-2">
                     <span className="font-medium text-gray-900 text-sm">{a.activity_name}</span>
                     <span className="text-xs text-gray-500">{childName(a.child_id)}</span>
+                    {/* CACFP compliance badge */}
+                    {a.activity_type === 'meal' && a.cacfp_compliant !== undefined && a.cacfp_compliant !== null && (
+                      <span
+                        title={a.cacfp_compliant ? 'CACFP compliant' : (a.compliance_notes ?? 'Not CACFP compliant')}
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${
+                          a.cacfp_compliant
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                        {a.cacfp_compliant ? '✓ CACFP' : '✗ CACFP'}
+                      </span>
+                    )}
                   </div>
                   {a.description && <p className="text-sm text-gray-600 mt-0.5">{a.description}</p>}
                   {a.notes && <p className="text-xs text-gray-500 mt-0.5 italic">{a.notes}</p>}

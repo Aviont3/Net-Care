@@ -64,18 +64,26 @@ class ActivityBase(BaseModel):
     activity_date: date
     activity_time: datetime
     activity_type: str  # meal, nap, diaper, play, learning, outdoor
+    meal_type: Optional[str] = None  # breakfast, lunch, supper, snack — only set when activity_type="meal"
     activity_name: str
     description: Optional[str] = None
     mood: Optional[str] = None  # happy, sad, energetic, tired, cranky, neutral
     duration_minutes: Optional[int] = None
     notes: Optional[str] = None
     photo_url: Optional[str] = None
+    food_components: Optional[dict] = None  # CACFP component dict, only for meal activities
+    cacfp_compliant: Optional[bool] = None  # Auto-set by validator on create
+    compliance_notes: Optional[str] = None  # Populated when cacfp_compliant=False
 
 
 class ActivityCreate(ActivityBase):
     """Schema for creating an activity. Date/time default to now if not provided."""
     activity_date: Optional[date] = None
     activity_time: Optional[datetime] = None
+    meal_type: Optional[str] = None  # breakfast, lunch, supper, snack
+    food_components: Optional[dict] = None
+    cacfp_compliant: Optional[bool] = None
+    compliance_notes: Optional[str] = None
 
     @model_validator(mode="after")
     def set_defaults(self):
