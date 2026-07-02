@@ -1,9 +1,10 @@
 # CACFP (Child and Adult Care Food Program) Models
 # ============================================
 
-from sqlalchemy import Column, String, Date, Boolean, Text, ForeignKey
+from sqlalchemy import Column, String, Date, Boolean, Text, ForeignKey, Integer, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy import Numeric
 from app.models.base import BaseModel
 
 
@@ -60,3 +61,73 @@ class CACFPFoodItem(BaseModel):
 
     def __repr__(self):
         return f"<CACFPFoodItem {self.name} ({self.component_category})>"
+
+
+class CACFPMonthlyClaim(BaseModel):
+    """Monthly reimbursement claim for WINS submission."""
+    __tablename__ = "cacfp_monthly_claims"
+
+    claim_month = Column(Integer, nullable=False)  # 1-12
+    claim_year = Column(Integer, nullable=False)
+    operating_days = Column(Integer, nullable=False)
+    total_attendance = Column(Integer, nullable=False)
+
+    # Meal counts
+    breakfast_count = Column(Integer, default=0, nullable=False)
+    lunch_count = Column(Integer, default=0, nullable=False)
+    supper_count = Column(Integer, default=0, nullable=False)
+    snack_count = Column(Integer, default=0, nullable=False)
+
+    # Enrollment by tier
+    free_enrolled = Column(Integer, default=0, nullable=False)
+    reduced_enrolled = Column(Integer, default=0, nullable=False)
+    paid_enrolled = Column(Integer, default=0, nullable=False)
+
+    # Calculated reimbursement
+    total_reimbursement = Column(Numeric(10, 2))
+
+    # Status
+    status = Column(String(20), default="draft", nullable=False, index=True)  # draft, submitted, approved
+    submitted_at = Column(DateTime)
+    submitted_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    notes = Column(Text)
+
+    # Relationships
+    submitter = relationship("User", foreign_keys=[submitted_by])
+
+    def __repr__(self):
+        return f"<CACFPMonthlyClaim {self.claim_year}-{self.claim_month:02d} status={self.status}>"
+
+
+class CACFPAuditLog(BaseModel):
+    """
+    Immutable audit trail for all CACFP-related record changes.
+    Rows in this table are never updated or deleted — only inserted.
+    Required for USDA CACFP 3-year record retention / audit defense.
+    """
+    __tablename__ = "cacfp_audit_log"
+
+    action = Column(
+        String(50), nullable=False, index=True
+    )  # create, correction, verify, submit_claim, deactivate
+    entity_type = Column(
+        String(50), nullable=False, index=True
+    )  # meal_activity, eligibility, claim
+    entity_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    field_changed = Column(String(100))   # which field was corrected (None for creates)
+    old_value = Column(Text)
+    new_value = Column(Text)
+    reason = Column(Text)                 # required for corrections
+
+    performed_by = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+
+    # Relationships
+    performer = relationship("User", foreign_keys=[performed_by])
+
+    def __repr__(self):
+        return (
+            f"<CACFPAuditLog action={self.action} entity={self.entity_type}"
+            f"/{self.entity_id} by={self.performed_by}>"
+        )

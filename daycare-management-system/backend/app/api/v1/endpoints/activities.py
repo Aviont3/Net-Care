@@ -21,6 +21,8 @@ from app.schemas.daily_operations import (
 )
 from app.core.security import get_current_user
 from app.services.cacfp_validator import validate_meal
+from app.services.cacfp_audit import log_audit
+from app.schemas.cacfp import ActivityCorrectionRequest
 
 router = APIRouter()
 
@@ -79,6 +81,17 @@ async def create_activity(
         db.add(new_activity)
         db.commit()
         db.refresh(new_activity)
+
+        # Immutable audit entry for CACFP meal records
+        if new_activity.activity_type == "meal":
+            log_audit(
+                db,
+                action="create",
+                entity_type="meal_activity",
+                entity_id=new_activity.id,
+                performed_by=current_user.id,
+            )
+            db.commit()
 
         return new_activity
     except Exception as e:
@@ -327,6 +340,8 @@ async def update_activity(
 ):
     """
     Update an activity record.
+    CACFP meal records that have been validated (cacfp_compliant is set) are
+    immutable — use POST /{activity_id}/correct instead.
     Only the staff member who logged it or an admin can update.
     """
     activity = db.query(Activity).filter(Activity.id == activity_id).first()
@@ -335,6 +350,16 @@ async def update_activity(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Activity with ID {activity_id} not found"
+        )
+
+    # CACFP immutability guard — validated meal records require the correction workflow
+    if activity.activity_type == "meal" and activity.cacfp_compliant is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "CACFP meal records cannot be edited directly after validation. "
+                "Use POST /activities/{id}/correct with a documented reason."
+            ),
         )
 
     # Check permissions
@@ -363,7 +388,9 @@ async def delete_activity(
 ):
     """
     Delete an activity record.
-    Only the staff member who logged it or an admin can delete.
+    CACFP meal records (any meal activity) cannot be deleted — USDA requires
+    3-year retention. Only the staff member who logged it or an admin can
+    delete non-meal activities.
     """
     activity = db.query(Activity).filter(Activity.id == activity_id).first()
 
@@ -371,6 +398,17 @@ async def delete_activity(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Activity with ID {activity_id} not found"
+        )
+
+    # Hard block on all meal activity deletions
+    if activity.activity_type == "meal":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "CACFP meal records cannot be deleted. "
+                "USDA regulations require 3-year retention. "
+                "Use POST /activities/{id}/correct to document errors."
+            ),
         )
 
     # Check permissions
@@ -387,8 +425,116 @@ async def delete_activity(
 
 
 # ============================================
-# PHOTO UPLOAD
+# CACFP MEAL CORRECTION (immutable audit trail)
 # ============================================
+
+# Fields permitted for correction on a validated CACFP meal record.
+# Structural fields (child_id, activity_date, logged_by) are never correctable.
+_CORRECTABLE_FIELDS = {
+    "activity_name", "description", "meal_type", "mood",
+    "duration_minutes", "notes", "food_components",
+}
+
+
+@router.post("/{activity_id}/correct", response_model=ActivityResponse)
+async def correct_meal_activity(
+    activity_id: UUID,
+    correction: ActivityCorrectionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Apply a documented correction to a CACFP meal activity record.
+
+    - `reason` is required — it is stored verbatim in the immutable audit log.
+    - Only whitelisted fields may be corrected; structural fields (child_id,
+      activity_date, logged_by) are never editable.
+    - Creates a CACFPAuditLog entry capturing old_value → new_value.
+    - If food_components or meal_type is corrected the CACFP compliance is
+      automatically re-evaluated.
+    - Only admins or the original logger may submit corrections.
+    """
+    if not correction.reason or not correction.reason.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A reason is required for all CACFP record corrections.",
+        )
+
+    if correction.field not in _CORRECTABLE_FIELDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Field '{correction.field}' cannot be corrected. "
+                f"Correctable fields: {', '.join(sorted(_CORRECTABLE_FIELDS))}."
+            ),
+        )
+
+    activity = db.query(Activity).filter(Activity.id == activity_id).first()
+    if not activity:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Activity not found")
+
+    if activity.activity_type != "meal":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The /correct endpoint is only for meal activities.",
+        )
+
+    if activity.logged_by != current_user.id and current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the original logger or an admin may correct this record.",
+        )
+
+    # Capture old value
+    old_val = getattr(activity, correction.field, None)
+    old_val_str = str(old_val) if old_val is not None else None
+
+    # Coerce new_value to the correct Python type
+    field = correction.field
+    new_val: object
+    if field == "duration_minutes":
+        try:
+            new_val = int(correction.new_value)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="duration_minutes must be an integer.")
+    elif field == "food_components":
+        import json
+        try:
+            new_val = json.loads(correction.new_value)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=422, detail="food_components must be valid JSON.")
+    else:
+        new_val = correction.new_value
+
+    # Apply the correction
+    setattr(activity, field, new_val)
+
+    # Re-run CACFP validator if compliance-relevant fields changed
+    if field in ("meal_type", "food_components"):
+        meal_type = activity.meal_type
+        food_components = activity.food_components
+        if meal_type and food_components:
+            from app.services.cacfp_validator import validate_meal
+            result = validate_meal(meal_type, food_components)
+            activity.cacfp_compliant = result["compliant"]
+            activity.compliance_notes = result["notes"] if not result["compliant"] else None
+
+    # Stage the audit entry in the same transaction
+    log_audit(
+        db,
+        action="correction",
+        entity_type="meal_activity",
+        entity_id=activity.id,
+        performed_by=current_user.id,
+        field_changed=field,
+        old_value=old_val_str,
+        new_value=correction.new_value,
+        reason=correction.reason.strip(),
+    )
+
+    db.commit()
+    db.refresh(activity)
+    return activity
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "uploads", "activities")
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"}
