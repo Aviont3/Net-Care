@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     emergency_contacts,
     authorized_pickup,
     compliance,
+    compliance_docs,
     incidents,
     medications,
     dashboard,
@@ -18,6 +19,7 @@ from app.api.v1.endpoints import (
     parent_portal,
     enrollment,
     calendar,
+    cacfp,
 )
 
 api_router = APIRouter()
@@ -31,6 +33,7 @@ api_router.include_router(activities.router, prefix="/activities", tags=["Activi
 api_router.include_router(emergency_contacts.router, prefix="/emergency-contacts", tags=["Emergency Contacts"])
 api_router.include_router(authorized_pickup.router, prefix="/authorized-pickup", tags=["Authorized Pickup"])
 api_router.include_router(compliance.router, prefix="/compliance", tags=["DCFS Compliance"])
+api_router.include_router(compliance_docs.router, prefix="/compliance", tags=["Compliance Management"])
 api_router.include_router(incidents.router, prefix="/incidents", tags=["Incident Reports"])
 api_router.include_router(medications.router, prefix="/medications", tags=["Medications"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
@@ -38,3 +41,4 @@ api_router.include_router(reports.router, prefix="/reports", tags=["Daily Report
 api_router.include_router(parent_portal.router, prefix="/parent", tags=["Parent Portal"])
 api_router.include_router(enrollment.router, prefix="/enrollment", tags=["Enrollment"])
 api_router.include_router(calendar.router, prefix="/calendar", tags=["Calendar"])
+api_router.include_router(cacfp.router, prefix="/cacfp", tags=["CACFP"])
